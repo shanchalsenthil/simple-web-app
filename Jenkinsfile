@@ -3,13 +3,58 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'MAVEN_HOME'
+    }
+
     stages {
 
-        stage('Build') {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build (Shared Library)') {
             steps {
                 script {
                     buildApp()
                 }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh 'mvn clean verify sonar:sonar'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Deploy to Nexus') {
+            steps {
+                nexusArtifactUploader(
+                    artifacts: [[
+                        artifactId: 'simple-web-app',
+                        classifier: '',
+                        file: 'target/simple-web-app-1.0.jar',
+                        type: 'jar'
+                    ]],
+                    credentialsId: 'nexus-cred',
+                    groupId: 'com.example',
+                    nexusUrl: 'localhost:8081',
+                    nexusVersion: 'nexus3',
+                    repository: 'maven-releases',
+                    version: '1.0'
+                )
             }
         }
     }
