@@ -57,5 +57,24 @@ pipeline {
                 )
             }
         }
+
+        //  NEW: Docker Build stage
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t java-app:latest .'
+                }
+            }
+        }
+
+        //  NEW: Run Docker container
+        stage('Run Docker Container') {
+            steps {
+                script {
+                    sh 'docker rm -f java-app || true'
+                    sh 'docker run -d -p 8085:8080 --name java-app java-app:latest'
+                }
+            }
+        }
     }
 }
