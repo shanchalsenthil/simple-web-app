@@ -1,3 +1,16 @@
 @Library('my-shared-lib') _
 
-buildApp()
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Build') {
+            steps {
+                script {
+                    buildApp()
+                }
+            }
+        }
+    }
+}
