@@ -7,6 +7,13 @@ pipeline {
         maven 'Maven-3'
     }
 
+    environment {
+        APP_NAME = "simple-web-app"
+        VERSION = "1.0"
+        DOCKER_IMAGE = "java-app"
+        NEXUS_DOCKER = "localhost:8083"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -15,7 +22,7 @@ pipeline {
             }
         }
 
-        stage('Build (Shared Library)') {
+        stage('Build Maven') {
             steps {
                 script {
                     buildApp()
@@ -39,42 +46,61 @@ pipeline {
             }
         }
 
-        stage('Deploy to Nexus') {
+        stage('Deploy JAR to Nexus') {
             steps {
                 nexusArtifactUploader(
-                    artifacts: [[
-                        artifactId: 'simple-web-app',
-                        classifier: '',
-                        file: 'target/simple-web-app-1.0.jar',
-                        type: 'jar'
-                    ]],
+                    protocol: 'http',
+                    nexusUrl: 'localhost:8081',
                     credentialsId: 'nexus-cred',
                     groupId: 'com.example',
-                    nexusUrl: 'localhost:8081',
-                    nexusVersion: 'nexus3',
+                    version: "${VERSION}",
                     repository: 'maven-releases',
-                    version: '1.0'
+                    artifacts: [[
+                        artifactId: "${APP_NAME}",
+                        classifier: '',
+                        file: "target/${APP_NAME}-${VERSION}.jar",
+                        type: 'jar'
+                    ]]
                 )
             }
         }
 
-        //  NEW: Docker Build stage
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh 'docker build -t java-app:latest .'
+                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
 
-        //  NEW: Run Docker container
         stage('Run Docker Container') {
             steps {
                 script {
-                    sh 'docker rm -f java-app || true'
-                    sh 'docker run -d -p 8085:8080 --name java-app java-app:latest'
+                    sh "docker rm -f ${DOCKER_IMAGE} || true"
+                    sh "docker run -d -p 8085:8080 --name ${DOCKER_IMAGE} ${DOCKER_IMAGE}:latest"
                 }
             }
+        }
+
+        stage('Push Docker Image to Nexus') {
+            steps {
+                script {
+                    sh """
+                        docker login ${NEXUS_DOCKER} -u admin -p admin123
+                        docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                        docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo ' Pipeline SUCCESS'
+        }
+        failure {
+            echo ' Pipeline FAILED'
         }
     }
 }
