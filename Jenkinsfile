@@ -39,11 +39,15 @@ pipeline {
             }
         }
 
+        // ✅ BETTER APPROACH (FIXED QUALITY GATE)
         stage('Quality Gate') {
             steps {
                 script {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
+                    def qg = waitForQualityGate()
+                    echo "Quality Gate Status: ${qg.status}"
+
+                    if (qg.status != 'OK') {
+                        error "Pipeline failed due to Quality Gate: ${qg.status}"
                     }
                 }
             }
