@@ -11,6 +11,7 @@ pipeline {
         APP_NAME = "simple-web-app"
         VERSION = "1.0"
         DOCKER_IMAGE = "java-app"
+        NEXUS_URL = "localhost:8081"
         NEXUS_DOCKER = "localhost:8083"
     }
 
@@ -49,8 +50,9 @@ pipeline {
         stage('Deploy JAR to Nexus') {
             steps {
                 nexusArtifactUploader(
+                    nexusVersion: 'nexus3',
                     protocol: 'http',
-                    nexusUrl: 'localhost:8081',
+                    nexusUrl: "${NEXUS_URL}",
                     credentialsId: 'nexus-cred',
                     groupId: 'com.example',
                     version: "${VERSION}",
@@ -67,40 +69,36 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
-                }
+                sh "docker build -t ${DOCKER_IMAGE}:latest ."
             }
         }
 
         stage('Run Docker Container') {
             steps {
-                script {
-                    sh "docker rm -f ${DOCKER_IMAGE} || true"
-                    sh "docker run -d -p 8085:8080 --name ${DOCKER_IMAGE} ${DOCKER_IMAGE}:latest"
-                }
+                sh """
+                    docker rm -f ${DOCKER_IMAGE} || true
+                    docker run -d -p 8085:8080 --name ${DOCKER_IMAGE} ${DOCKER_IMAGE}:latest
+                """
             }
         }
 
-        stage('Push Docker Image to Nexus') {
+        stage('Push Docker Image (Nexus)') {
             steps {
-                script {
-                    sh """
-                        docker login ${NEXUS_DOCKER} -u admin -p admin123
-                        docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
-                        docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
-                    """
-                }
+                sh """
+                    docker login ${NEXUS_DOCKER} -u admin -p admin123
+                    docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                    docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                """
             }
         }
     }
 
     post {
         success {
-            echo ' Pipeline SUCCESS'
+            echo "PIPELINE SUCCESS"
         }
         failure {
-            echo ' Pipeline FAILED'
+            echo "PIPELINE FAILED"
         }
     }
 }
