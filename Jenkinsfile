@@ -13,6 +13,7 @@ pipeline {
         DOCKER_IMAGE = "java-app"
         NEXUS_URL = "localhost:8081"
         NEXUS_DOCKER = "localhost:8083"
+        SCANNER_HOME = tool 'sonar-scanner'
     }
 
     stages {
@@ -23,31 +24,39 @@ pipeline {
             }
         }
 
-        stage('Build Maven') {
+        stage('Build & Test') {
             steps {
-                script {
-                    buildApp()
-                }
+                sh 'mvn clean verify'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar-server') {
-                    sh 'mvn clean verify sonar:sonar'
+                withSonarQubeEnv('sonar') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                          -Dsonar.projectKey=simple-web \
+                          -Dsonar.projectName=simple-web \
+                          -Dsonar.sources=src \
+                          -Dsonar.tests=src/test/java \
+                          -Dsonar.java.binaries=target \
+                          -Dsonar.exclusions=target/**,**/*.jar \
+                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                    '''
                 }
             }
         }
 
-        // ✅ BETTER APPROACH (FIXED QUALITY GATE)
         stage('Quality Gate') {
             steps {
-                script {
-                    def qg = waitForQualityGate()
-                    echo "Quality Gate Status: ${qg.status}"
+                timeout(time: 5, unit: 'MINUTES') {
+                    script {
+                        def qg = waitForQualityGate()
+                        echo "Quality Gate Status: ${qg.status}"
 
-                    if (qg.status != 'OK') {
-                        error "Pipeline failed due to Quality Gate: ${qg.status}"
+                        if (qg.status != 'OK') {
+                            error "❌ Quality Gate Failed: ${qg.status}"
+                        }
                     }
                 }
             }
@@ -90,21 +99,27 @@ pipeline {
 
         stage('Push Docker Image (Nexus)') {
             steps {
-                sh """
-                    docker login ${NEXUS_DOCKER} -u admin -p admin123
-                    docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
-                    docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-docker-cred',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        docker login ${NEXUS_DOCKER} -u $DOCKER_USER -p $DOCKER_PASS
+                        docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                        docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo "PIPELINE SUCCESS"
+            echo "✅ PIPELINE SUCCESS"
         }
         failure {
-            echo "PIPELINE FAILED"
+            echo "❌ PIPELINE FAILED"
         }
     }
 }
