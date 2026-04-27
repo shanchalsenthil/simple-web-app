@@ -31,21 +31,21 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonar') {
-                    sh '''
-                        $SCANNER_HOME/bin/sonar-scanner \
-                          -Dsonar.projectKey=simple-web \
-                          -Dsonar.projectName=simple-web \
-                          -Dsonar.sources=src \
-                          -Dsonar.tests=src/test/java \
-                          -Dsonar.java.binaries=target \
-                          -Dsonar.exclusions=target/**,**/*.jar \
-                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                    '''
-                }
-            }
+    steps {
+        withSonarQubeEnv('sonar') {
+            sh """
+                ${SCANNER_HOME}/bin/sonar-scanner \
+                  -Dsonar.projectKey=simple-web \
+                  -Dsonar.projectName=simple-web \
+                  -Dsonar.sources=src \
+                  -Dsonar.tests=src/test/java \
+                  -Dsonar.java.binaries=target \
+                  -Dsonar.exclusions=target/**,**/*.jar \
+                  -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            """
         }
+    }
+}
 
         stage('Quality Gate') {
             steps {
