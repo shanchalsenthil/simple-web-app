@@ -13,7 +13,7 @@ pipeline {
         DOCKER_IMAGE = "java-app"
         NEXUS_URL = "localhost:8081"
         NEXUS_DOCKER = "localhost:8083"
-        SCANNER_HOME = tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar'
     }
 
     stages {
@@ -55,7 +55,7 @@ pipeline {
                         echo "Quality Gate Status: ${qg.status}"
 
                         if (qg.status != 'OK') {
-                            error "❌ Quality Gate Failed: ${qg.status}"
+                            error "Quality Gate Failed: ${qg.status}"
                         }
                     }
                 }
@@ -116,10 +116,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ PIPELINE SUCCESS"
+            echo "PIPELINE SUCCESS"
         }
         failure {
-            echo "❌ PIPELINE FAILED"
+            echo "PIPELINE FAILED"
         }
     }
 }
