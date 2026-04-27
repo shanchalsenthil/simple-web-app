@@ -37,7 +37,7 @@ pipeline {
                 ${SCANNER_HOME}/bin/sonar-scanner \
                   -Dsonar.projectKey=simple-web \
                   -Dsonar.projectName=simple-web \
-                  -Dsonar.sources=src \
+                  -Dsonar.sources=src/main/java \
                   -Dsonar.tests=src/test/java \
                   -Dsonar.java.binaries=target \
                   -Dsonar.exclusions=target/**,**/*.jar \
