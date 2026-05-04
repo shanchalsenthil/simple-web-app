@@ -11,8 +11,8 @@ pipeline {
         APP_NAME = "simple-web-app"
         VERSION = "1.0"
         DOCKER_IMAGE = "java-app"
-        NEXUS_URL = "localhost:8081"
-        NEXUS_DOCKER = "localhost:8083"
+        NEXUS_URL = "172.16.101.201:8081"
+        NEXUS_DOCKER = "172.16.101.201:8083"
         SCANNER_HOME = tool 'sonar'
     }
 
@@ -29,31 +29,27 @@ pipeline {
                 sh 'mvn clean verify'
             }
         }
- 
+
         stage('SonarQube Analysis') {
-    steps {
-        withSonarQubeEnv('sonar-server') {
-            sh """
-                ${SCANNER_HOME}/bin/sonar-scanner \
-                  -Dsonar.projectKey=simple-web \
-                  -Dsonar.projectName=simple-web \
-                  -Dsonar.sources=src/main/java \
-                  -Dsonar.tests=src/test/java \
-                  -Dsonar.java.binaries=target \
-                  -Dsonar.exclusions=target/**,**/*.jar \
-                  -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-            """
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=simple-web \
+                        -Dsonar.projectName=simple-web \
+                        -Dsonar.sources=src/main/java \
+                        -Dsonar.tests=src/test/java \
+                        -Dsonar.java.binaries=target
+                    """
+                }
+            }
         }
-    }
-}
 
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     script {
                         def qg = waitForQualityGate()
-                        echo "Quality Gate Status: ${qg.status}"
-
                         if (qg.status != 'OK') {
                             error "Quality Gate Failed: ${qg.status}"
                         }
@@ -88,16 +84,15 @@ pipeline {
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Tag Docker Image') {
             steps {
                 sh """
-                    docker rm -f ${DOCKER_IMAGE} || true
-                    docker run -d -p 8085:8080 --name ${DOCKER_IMAGE} ${DOCKER_IMAGE}:latest
+                    docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
                 """
             }
         }
 
-        stage('Push Docker Image (Nexus)') {
+        stage('Push Docker Image to Nexus') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-docker-cred',
@@ -106,7 +101,6 @@ pipeline {
                 )]) {
                     sh """
                         docker login ${NEXUS_DOCKER} -u $DOCKER_USER -p $DOCKER_PASS
-                        docker tag ${DOCKER_IMAGE}:latest ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
                         docker push ${NEXUS_DOCKER}/${DOCKER_IMAGE}:latest
                     """
                 }
